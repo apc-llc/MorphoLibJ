@@ -102,6 +102,8 @@ public class WatershedTransform2D
 	{
 		this.inputImage = input;
 		this.maskImage = mask;
+
+		System.loadLibrary(WatershedTransform2D.class.getResource( "native/libWatershed.so" ).getFile() );
 	}
 	
 	/**
@@ -125,6 +127,8 @@ public class WatershedTransform2D
 		}
 		
 		this.connectivity = connectivity;
+
+		System.load(WatershedTransform2D.class.getResource( "/native/libWatershed.so" ).getFile() );
 	}
 	
 	/**
@@ -222,190 +226,12 @@ public class WatershedTransform2D
 	
 	
 
-	private static void applyWithMask(
+	private static native void applyWithMask(
 			double hMin, double hMax,
 			int size1, int size2, int connectivity, boolean verbose,
 			ArrayList<PixelRecord> pixelList,
-			final int[][] tabLabels,
-			ImageProcessor maskImage)
-	{
-	    int currentLabel = 0;
-	    
-	    boolean flag = false;	    
-
-	    if( verbose ) IJ.log("  Sorting pixels by value..." );
-	    IJ.showStatus("Sorting pixels by value...");
-	    final long t1 = System.currentTimeMillis();
-	    Collections.sort( pixelList );
-	    final long t2 = System.currentTimeMillis();
-	    if( verbose ) IJ.log("  Sorting took " + (t2-t1) + " ms.");
-	    
-	    IJ.log( "  Flooding..." );
-	    IJ.showStatus( "Flooding..." );
-	    final long start = System.currentTimeMillis();
-	    
-      	// Check connectivity
-       	final Neighborhood2D neigh = connectivity == 4 ? 
-       		new Neighborhood2DC4() : new Neighborhood2DC8();
-	    	    
-	    LinkedList<Cursor2D> fifo = new LinkedList<Cursor2D>();
-	      
-        // set initial pixel index
-        int currentIndex = 0;
-
-        int heightIndex1 = currentIndex;
-        int heightIndex2 = currentIndex;
-
-	    // value INIT is assigned to each pixel of the output labels
-	    for( int i=0; i<size1; i++ )
-	    	Arrays.fill( tabLabels[i], INIT );
-        
-	    // for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
-	    while( currentIndex < pixelList.size() )
-	    {	    	
-	    	double h = pixelList.get( currentIndex ).getValue();	    	
-	    		    		    		    	
-	    	for(int pixelIndex = heightIndex1; pixelIndex < pixelList.size(); pixelIndex ++)
-	    	{
-	    		final PixelRecord pixelRecord = pixelList.get( pixelIndex );
-	    			    		
-	    		if( pixelRecord.getValue() != h )
-	    		{
-	    			// this pixel is at level h+1
-	    			heightIndex1 = pixelIndex;
-	    			break;
-	    		}
-	    			    		
-	    		final Cursor2D p = pixelRecord.getCursor();
-	    		final int i = p.getX();
-	    		final int j = p.getY();
-	    			    		
-	    		// set label to MASK
-	    		tabLabels[ i ][ j ] = MASK;
-
-	    		// read neighbor coordinates	    		
-	    		neigh.setCursor( p );
-	    		for( Cursor2D c : neigh.getNeighbors() )			       		
-	    		{       			
-	    			int u = c.getX();
-	    			int v = c.getY();
-
-	    			// initialize queue with neighbors at level h of current basins or watersheds
-	    			if ( u >= 0 && u < size1 && v >= 0 && v < size2 
-	    					&& tabLabels[ u ][ v ] >= WSHED 
-	    					&& maskImage.getf( u, v ) > 0 ) 
-	    				//&&  ( tabLabels[ u ][ v ] > 0 || tabLabels[ u ][ v ] == WSHED ) )
-	    				{
-	    					fifo.addLast( p );
-	    					tabLabels[ i ][ j ] = INQUEUE;
-	    					break;
-	    				}	    			
-	    		}// end for	    	
-	    	}// end for
-
-	    	while( fifo.isEmpty() == false )
-	    	{
-	    		// retrieve point p
-	    		final Cursor2D p = fifo.poll();	    		
-	    		final int i = p.getX();
-	    		final int j = p.getY();
-
-	    		// read neighbor coordinates
-	    		neigh.setCursor( p );
-
-	    		for( Cursor2D c : neigh.getNeighbors() )			       		
-	    		{
-	    			// labeling current point by inspecting neighbors
-	    			int u = c.getX();
-	    			int v = c.getY();
-
-	    			if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskImage.getf( u, v ) > 0 )
-	    			{
-	    				if ( tabLabels[ u ][ v ] > 0 ) // i.e. the pixel belongs to an already labeled basin
-	    				{
-	    					if ( tabLabels[ i ][ j ] == INQUEUE || (tabLabels[ i ][ j ] == WSHED && flag == true ) )
-	    					{
-	    						tabLabels[ i ][ j ] = tabLabels[ u ][ v ];
-	    					}
-	    					else if ( tabLabels[ i ][ j ] > 0 && tabLabels[ i ][ j ] != tabLabels[ u ][ v ] )
-	    					{
-	    						tabLabels[ i ][ j ] = WSHED;
-	    						flag = false;
-	    					}       					
-	    				}
-	    				else if ( tabLabels[ u ][ v ] == WSHED )	    					
-	    				{
-	    					if( tabLabels[ i ][ j ] == INQUEUE )
-	    					{
-	    						tabLabels[ i ][ j ] = WSHED;
-	    						flag = true;
-	    					}
-	    				}
-	    				else if ( tabLabels[ u ][ v ] == MASK )
-	    				{
-	    					tabLabels[ u ][ v ] = INQUEUE;
-	    					fifo.addLast( c );
-	    				}
-	    			}       			       			
-	    		}	    	
-	    	}
-
-	    	// check for new minima at level h
-	    		    	
-	    	for(int pixelIndex = heightIndex2; pixelIndex < pixelList.size(); pixelIndex ++, currentIndex++)
-	    	{
-	    		final PixelRecord pixelRecord = pixelList.get( pixelIndex );	    			    		
-	    		
-	    		if( pixelRecord.getValue() != h )
-	    		{
-	    			// this pixel is at level h+1
-	    			heightIndex2 = pixelIndex;
-	    			break;
-	    		}
-	    			    		
-	    		final Cursor2D p = pixelRecord.getCursor();
-	    		final int i = p.getX();
-	    		final int j = p.getY();
-	    		
-	    		if ( tabLabels[ i ][ j ] == MASK ) // the pixel is inside a new minimum
-	    		{
-	    			currentLabel ++;
-	    			fifo.addLast( p );
-	    			tabLabels[ i ][ j ] = currentLabel;
-	    			
-	    			while( fifo.isEmpty() == false )
-	    	    	{
-	    				final Cursor2D p2 = fifo.poll();
-
-	    	    		// read neighbor coordinates
-	    	    		neigh.setCursor( p2 );
-
-	    	    		for( Cursor2D c : neigh.getNeighbors() ) // inspect neighbors of p2		       		
-	    	    		{       			
-	    	    			int u = c.getX();
-	    	    			int v = c.getY();
-	    	    			
-	    	    			if ( u >= 0 && u < size1 && v >= 0 && v < size2 
-	    	    					&& tabLabels[ u ][ v ] == MASK 
-	    	    					&& maskImage.getf( u, v ) > 0 )
-	    	    			{
-	    	    				fifo.addLast( c );
-	    	    				tabLabels[ u ][ v ] = currentLabel;
-	    	    			}	    	    				    	    			
-	    	    		}// end for
-	    	    	}// end while
-	    		}// end if	    		
-	    	}// end for
-	    		    		    	
-	    	IJ.showProgress( h / hMax );
-	    	
-	    }// end while (flooding)
-	    
-	    IJ.showProgress( 1.0 );
-	    
-	    final long end = System.currentTimeMillis();
-		if( verbose ) IJ.log("  Flooding took: " + (end-start) + " ms");
-	}
+			final int[][] tabLabels, ImageProcessor maskImage,
+			int MASK, int WSHED, int INIT, int INQUEUE);
 
 
 
@@ -447,8 +273,9 @@ public class WatershedTransform2D
 	    // output labels
 	    final int[][] tabLabels = new int[ size1 ][ size2 ];
 	    
-	    applyWithMask(hMin, hMax, size1, size2, connectivity, verbose, pixelList, tabLabels, maskImage);
-	    
+	    applyWithMask(hMin, hMax, size1, size2, connectivity, verbose,
+			pixelList, tabLabels, maskImage, MASK, WSHED, INIT, INQUEUE);
+
 	    // Create result label image	    	
 		FloatProcessor fp = new FloatProcessor( size1, size2 );
 		for (int i = 0; i < size1; ++i)
