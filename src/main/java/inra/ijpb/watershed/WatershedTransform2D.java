@@ -221,50 +221,21 @@ public class WatershedTransform2D
 	}
 	
 	
-	
-	/**
-	 * Apply fast watersheds using flooding simulations, as described
-	 * by Soille, Pierre, and Luc M. Vincent. "Determining watersheds 
-	 * in digital pictures via flooding simulations." Lausanne-DL 
-	 * tentative. International Society for Optics and Photonics, 1990.
-	 * This implementation uses a binary mask to restrict regions of
-	 * application.
-	 * NOTE: this algorithm may have plateaus in the dams.
-	 *
-	 * @param hMin minimum grayscale level height
-	 * @param hMax maximum grayscale level height
-	 * @return 32-bit image of labeled catchment basins (with dams)
-	 */
-	private ImageProcessor applyWithMask(
-			double hMin,
-			double hMax ) 
+
+	private static void applyWithMask(
+			double hMin, double hMax,
+			int size1, int size2, int connectivity, boolean verbose,
+			ArrayList<PixelRecord> pixelList,
+			final int[][] tabLabels,
+			ImageProcessor maskImage)
 	{
-	    final int size1 = inputImage.getWidth();
-	    final int size2 = inputImage.getHeight();
-	       	    
-	    // output labels
-	    final int[][] tabLabels = new int[ size1 ][ size2 ]; 
-	    
-	    // value INIT is assigned to each pixel of the output labels
-	    for( int i=0; i<size1; i++ )
-	    		Arrays.fill( tabLabels[i], INIT );
-	    
 	    int currentLabel = 0;
 	    
 	    boolean flag = false;	    
-	    
-	    // Make list of pixels and sort it in ascending order
-	    IJ.showStatus( "Extracting pixel values..." );
-	    if( verbose ) IJ.log("  Extracting pixel values (h_min = " + hMin + ", h_max = " + hMax + ")..." );
-	    final long t0 = System.currentTimeMillis();
 
-	    // list of original pixels values and corresponding coordinates
-	    ArrayList<PixelRecord> pixelList = extractPixelValues( inputImage, hMin, hMax );
-
-	    final long t1 = System.currentTimeMillis();		
-	    if( verbose ) IJ.log("  Extraction took " + (t1-t0) + " ms.");
 	    if( verbose ) IJ.log("  Sorting pixels by value..." );
 	    IJ.showStatus("Sorting pixels by value...");
+	    final long t1 = System.currentTimeMillis();
 	    Collections.sort( pixelList );
 	    final long t2 = System.currentTimeMillis();
 	    if( verbose ) IJ.log("  Sorting took " + (t2-t1) + " ms.");
@@ -275,7 +246,7 @@ public class WatershedTransform2D
 	    
       	// Check connectivity
        	final Neighborhood2D neigh = connectivity == 4 ? 
-       									new Neighborhood2DC4() : new Neighborhood2DC8();
+       		new Neighborhood2DC4() : new Neighborhood2DC8();
 	    	    
 	    LinkedList<Cursor2D> fifo = new LinkedList<Cursor2D>();
 	      
@@ -284,6 +255,10 @@ public class WatershedTransform2D
 
         int heightIndex1 = currentIndex;
         int heightIndex2 = currentIndex;
+
+	    // value INIT is assigned to each pixel of the output labels
+	    for( int i=0; i<size1; i++ )
+	    	Arrays.fill( tabLabels[i], INIT );
         
 	    // for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
 	    while( currentIndex < pixelList.size() )
@@ -430,47 +405,29 @@ public class WatershedTransform2D
 	    
 	    final long end = System.currentTimeMillis();
 		if( verbose ) IJ.log("  Flooding took: " + (end-start) + " ms");
-	    
-	    // Create result label image
-	    	
-		FloatProcessor fp = new FloatProcessor( size1, size2 );
-		for (int i = 0; i < size1; ++i)
-			for (int j = 0; j < size2; ++j)
-			{
-				if( tabLabels[ i ][ j ] == INIT ) // set unlabeled pixels to 0
-					fp.setf( i, j, 0 );	
-				else
-					fp.setf( i, j, tabLabels[i][j] );
-			}		
-	    				    
-	    return fp;
 	}
-	
-	
+
+
+
 	/**
 	 * Apply fast watersheds using flooding simulations, as described
 	 * by Soille, Pierre, and Luc M. Vincent. "Determining watersheds 
 	 * in digital pictures via flooding simulations." Lausanne-DL 
 	 * tentative. International Society for Optics and Photonics, 1990.
+	 * This implementation uses a binary mask to restrict regions of
+	 * application.
 	 * NOTE: this algorithm may have plateaus in the dams.
 	 *
 	 * @param hMin minimum grayscale level height
 	 * @param hMax maximum grayscale level height
 	 * @return 32-bit image of labeled catchment basins (with dams)
 	 */
-	private ImageProcessor applyWithoutMask(
+	private ImageProcessor applyWithMask(
 			double hMin,
 			double hMax ) 
 	{
 	    final int size1 = inputImage.getWidth();
 	    final int size2 = inputImage.getHeight();
-	       	    
-	    // output labels
-	    final int[][] tabLabels = new int[ size1 ][ size2 ]; 
-	    
-	    // value INIT is assigned to each pixel of the output labels
-	    for( int i=0; i<size1; i++ )
-	    		Arrays.fill( tabLabels[i], INIT );
 	    
 	    int currentLabel = 0;
 	    
@@ -486,8 +443,42 @@ public class WatershedTransform2D
 
 	    final long t1 = System.currentTimeMillis();		
 	    if( verbose ) IJ.log("  Extraction took " + (t1-t0) + " ms.");
+
+	    // output labels
+	    final int[][] tabLabels = new int[ size1 ][ size2 ];
+	    
+	    applyWithMask(hMin, hMax, size1, size2, connectivity, verbose, pixelList, tabLabels, maskImage);
+	    
+	    // Create result label image	    	
+		FloatProcessor fp = new FloatProcessor( size1, size2 );
+		for (int i = 0; i < size1; ++i)
+			for (int j = 0; j < size2; ++j)
+			{
+				if( tabLabels[ i ][ j ] == INIT ) // set unlabeled pixels to 0
+					fp.setf( i, j, 0 );	
+				else
+					fp.setf( i, j, tabLabels[i][j] );
+			}		
+	    				    
+	    return fp;
+	}
+	
+	
+
+	private static void applyWithoutMask(
+			double hMin, double hMax,
+			int size1, int size2, int connectivity, boolean verbose,
+			ArrayList<PixelRecord> pixelList,
+			final int[][] tabLabels,
+			ImageProcessor maskImage)
+	{
+	    int currentLabel = 0;
+	    
+	    boolean flag = false;	    
+
 	    if( verbose ) IJ.log("  Sorting pixels by value..." );
 	    IJ.showStatus("Sorting pixels by value...");
+	    final long t1 = System.currentTimeMillis();
 	    Collections.sort( pixelList );
 	    final long t2 = System.currentTimeMillis();
 	    if( verbose ) IJ.log("  Sorting took " + (t2-t1) + " ms.");
@@ -651,9 +642,49 @@ public class WatershedTransform2D
 	    
 	    final long end = System.currentTimeMillis();
 		if( verbose ) IJ.log("  Flooding took: " + (end-start) + " ms");
+	}
+
+
+
+	/**
+	 * Apply fast watersheds using flooding simulations, as described
+	 * by Soille, Pierre, and Luc M. Vincent. "Determining watersheds 
+	 * in digital pictures via flooding simulations." Lausanne-DL 
+	 * tentative. International Society for Optics and Photonics, 1990.
+	 * NOTE: this algorithm may have plateaus in the dams.
+	 *
+	 * @param hMin minimum grayscale level height
+	 * @param hMax maximum grayscale level height
+	 * @return 32-bit image of labeled catchment basins (with dams)
+	 */
+	private ImageProcessor applyWithoutMask(
+			double hMin,
+			double hMax ) 
+	{
+	    final int size1 = inputImage.getWidth();
+	    final int size2 = inputImage.getHeight();
 	    
-	    // Create result label image
-	    	
+	    int currentLabel = 0;
+	    
+	    boolean flag = false;	    
+	    
+	    // Make list of pixels and sort it in ascending order
+	    IJ.showStatus( "Extracting pixel values..." );
+	    if( verbose ) IJ.log("  Extracting pixel values (h_min = " + hMin + ", h_max = " + hMax + ")..." );
+	    final long t0 = System.currentTimeMillis();
+
+	    // list of original pixels values and corresponding coordinates
+	    ArrayList<PixelRecord> pixelList = extractPixelValues( inputImage, hMin, hMax );
+
+	    final long t1 = System.currentTimeMillis();		
+	    if( verbose ) IJ.log("  Extraction took " + (t1-t0) + " ms.");
+
+	    // output labels
+	    final int[][] tabLabels = new int[ size1 ][ size2 ]; 
+
+		applyWithoutMask(hMin, hMax, size1, size2, connectivity, verbose, pixelList, tabLabels, maskImage);
+	    
+	    // Create result label image	    	
 		FloatProcessor fp = new FloatProcessor( size1, size2 );
 		for (int i = 0; i < size1; ++i)
 			for (int j = 0; j < size2; ++j)
@@ -684,7 +715,6 @@ public class WatershedTransform2D
 			final double hMin,
 			final double hMax ) 
 	{
-		
 		final int size1 = inputImage.getWidth();
 	    final int size2 = inputImage.getHeight();
 			         
@@ -793,6 +823,10 @@ public class WatershedTransform2D
         
         int heightIndex1 = currentIndex;
         int heightIndex2 = currentIndex;
+
+	    // value INIT is assigned to each pixel of the output labels
+	    for( int i=0; i<size1; i++ )
+	    	Arrays.fill( tabLabels[i], INIT );
                 
 	    // for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
 	    while( currentIndex < pixelList.size() && h <= hMax )
