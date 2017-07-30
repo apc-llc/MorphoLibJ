@@ -103,7 +103,7 @@ public class WatershedTransform2D
 		this.inputImage = input;
 		this.maskImage = mask;
 
-		System.loadLibrary(WatershedTransform2D.class.getResource( "native/libWatershed.so" ).getFile() );
+		System.loadLibrary(WatershedTransform2D.class.getResource( "/libWatershedNative.so" ).getFile() );
 	}
 	
 	/**
@@ -128,7 +128,7 @@ public class WatershedTransform2D
 		
 		this.connectivity = connectivity;
 
-		System.load(WatershedTransform2D.class.getResource( "/native/libWatershed.so" ).getFile() );
+		System.load(WatershedTransform2D.class.getResource( "/libWatershedNative.so" ).getFile() );
 	}
 	
 	/**

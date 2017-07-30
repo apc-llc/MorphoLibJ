@@ -95,6 +95,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 		<package-name>inra.ijpb</package-name>
 		<license.licenseName>lgpl_v3</license.licenseName>
 		<license.copyrightOwners>INRA.</license.copyrightOwners>
+
+		<enforcer.skip>true</enforcer.skip>
+
+		<classifier>${platform}</classifier>
+		<download.cmake>true</download.cmake>
+		<cmake.version>3.7.2-b1</cmake.version>
 	</properties>
 
 	<repositories>
@@ -123,5 +129,289 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Add dependency for native code compilation -->
+		<dependency>
+			<groupId>com.googlecode.cmake-maven-project</groupId>
+			<artifactId>cmake-maven-plugin</artifactId>
+			<version>${cmake.version}</version>
+		</dependency>
+
+		<!-- Add dependency for OS/platform detection -->
+		<dependency>
+			<groupId>kr.motd.maven</groupId>
+			<artifactId>os-maven-plugin</artifactId>
+			<version>1.4.0.Final</version>
+        </dependency>
 	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>com.googlecode.cmake-maven-project</groupId>
+				<artifactId>cmake-maven-plugin</artifactId>
+				<version>${cmake.version}</version>
+				<executions>
+					<execution>
+						<id>cmake-generate</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<sourcePath>${basedir}/src/main/resources/native</sourcePath>
+							<targetPath>${project.build.directory}/classes</targetPath>
+							<generator>${cmake.generator}</generator>
+							<classifier>${cmake.classifier}</classifier>
+							<options>${cmake.options}</options>
+							<environmentVariables>
+								<CMAKE_CLASSIFIER>${cmake.classifier}</CMAKE_CLASSIFIER>
+							</environmentVariables>
+							<downloadBinaries>${download.cmake}</downloadBinaries>
+						</configuration>
+					</execution>
+					<execution>
+						<id>cmake-compile</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<projectDirectory>${project.build.directory}/classes</projectDirectory>
+							<classifier>${cmake.classifier}</classifier>
+							<config>${cmake.config}</config>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>list-profiles</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<executions>
+							<execution>
+								<phase>validate</phase>
+								<goals>
+									<goal>run</goal>
+								</goals>
+								<configuration>
+									<tasks>
+										<echo>Please pick one of the following profiles:</echo>
+										<echo>* windows-x86_32-debug</echo>
+										<echo>* windows-x86_32-release</echo>
+										<echo>* windows-x86_32_64-debug</echo>
+										<echo>* windows-x86_32_64-release</echo>
+										<echo>* linux-x86_32-debug</echo>
+										<echo>* linux-x86_32-release</echo>
+										<echo>* linux-x86_64-debug</echo>
+										<echo>* linux-x86_64-release</echo>
+										<echo>* mac-x86_64-debug</echo>
+										<echo>* mac-x86_64-release</echo>
+										<echo/>
+										<echo>For instance: mvn -Pwindows-x86_32-debug install</echo>
+										<fail/>
+									</tasks>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>windows-x86_32-debug</id>
+			<properties>
+				<platform>windows-x86_32</platform>
+				<build.type>debug</build.type>
+				<cmake.classifier>windows-x86_32</cmake.classifier>
+				<cmake.generator>Visual Studio 14 2015</cmake.generator>
+				<cmake.config>${build.type}</cmake.config>
+				<!--
+				CMake interprets the lack of a generator architecture ("-A<platform>") as x86. There doesn't
+				seem to be any other way to specify it.
+				-->
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-x86_32-release</id>
+			<activation>
+				<property>
+					<name>osDetection</name>
+					<value>!false</value>
+				</property>
+				<os>
+					<family>windows</family>
+					<arch>x86</arch>
+				</os>
+			</activation>
+			<properties>
+				<platform>windows-x86_32</platform>
+				<build.type>release</build.type>
+				<cmake.classifier>windows-x86_32</cmake.classifier>
+				<cmake.generator>Visual Studio 14 2015</cmake.generator>
+				<cmake.config>${build.type}</cmake.config>
+				<!--
+				CMake interprets the lack of a generator architecture ("-A<platform>") as x86. There doesn't
+				seem to be any other way to specify it.
+				-->
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-x86_64-debug</id>
+			<properties>
+				<platform>windows-x86_64</platform>
+				<build.type>debug</build.type>
+				<cmake.classifier>windows-x86_64</cmake.classifier>
+				<cmake.generator>Visual Studio 14 2015</cmake.generator>
+				<cmake.options>-Ax64</cmake.options>
+				<cmake.config>${build.type}</cmake.config>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-x86_64-release</id>
+			<activation>
+				<property>
+					<name>osDetection</name>
+					<value>!false</value>
+				</property>
+				<os>
+					<family>windows</family>
+					<arch>amd64</arch>
+				</os>
+			</activation>
+			<properties>
+				<platform>windows-x86_64</platform>
+				<build.type>release</build.type>
+				<cmake.classifier>windows-x86_64</cmake.classifier>
+				<cmake.generator>Visual Studio 14 2015</cmake.generator>
+				<cmake.options>-Ax64</cmake.options>
+				<cmake.config>${build.type}</cmake.config>
+			</properties>
+		</profile>
+		<profile>
+			<id>linux-x86_32-debug</id>
+			<properties>
+				<platform>linux-x86_32</platform>
+				<build.type>debug</build.type>
+				<cmake.classifier>linux-x86_32</cmake.classifier>
+				<cmake.generator>Unix Makefiles</cmake.generator>
+				<download.cmake>false</download.cmake>
+			</properties>
+		</profile>
+		<profile>
+			<id>linux-x86_32-release</id>
+			<activation>
+				<property>
+					<name>osDetection</name>
+					<value>!false</value>
+				</property>
+				<os>
+					<family>linux</family>
+					<arch>i386</arch>
+				</os>
+			</activation>
+			<properties>
+				<platform>linux-x86_32</platform>
+				<build.type>release</build.type>
+				<cmake.classifier>linux-x86_32</cmake.classifier>
+				<cmake.generator>Unix Makefiles</cmake.generator>
+				<download.cmake>false</download.cmake>
+			</properties>
+		</profile>
+		<profile>
+			<id>linux-x86_64-debug</id>
+			<properties>
+				<platform>linux-x86_64</platform>
+				<build.type>debug</build.type>
+			</properties>
+		</profile>
+		<profile>
+			<id>linux-x86_64-release</id>
+			<activation>
+				<property>
+					<name>osDetection</name>
+					<value>!false</value>
+				</property>
+				<os>
+					<family>linux</family>
+					<arch>amd64</arch>
+				</os>
+			</activation>
+			<properties>
+				<platform>linux-x86_64</platform>
+				<build.type>release</build.type>
+				<cmake.classifier>linux-x86_64</cmake.classifier>
+				<cmake.generator>Unix Makefiles</cmake.generator>
+			</properties>
+		</profile>
+		<profile>
+			<id>mac-x86_64-debug</id>
+			<properties>
+				<platform>mac-x86_64</platform>
+				<build.type>debug</build.type>
+				<cmake.classifier>mac-x86_64</cmake.classifier>
+				<cmake.generator>Unix Makefiles</cmake.generator>
+			</properties>
+		</profile>
+		<profile>
+			<id>mac-x86_64-release</id>
+			<activation>
+				<property>
+					<name>osDetection</name>
+					<value>!false</value>
+				</property>
+				<os>
+					<family>mac</family>
+					<arch>x86_64</arch>
+				</os>
+			</activation>
+			<properties>
+				<platform>mac-x86_64</platform>
+				<build.type>release</build.type>
+				<cmake.classifier>mac-x86_64</cmake.classifier>
+				<cmake.generator>Unix Makefiles</cmake.generator>
+			</properties>
+		</profile>
+		<profile>
+			<id>portable</id>
+			<!--
+			Sonatype requires a main jar, even for platform-specific artifacts, so we supply it with an
+			empty file.
+			-->
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>com.googlecode.cmake-maven-project</groupId>
+						<artifactId>cmake-maven-plugin</artifactId>
+						<version>${cmake.version}</version>
+						<executions>
+							<execution>
+								<id>cmake-generate</id>
+								<phase>none</phase>
+							</execution>
+							<execution>
+								<id>cmake-compile</id>
+								<phase>none</phase>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+			<properties>
+				<platform>portable</platform>
+				<build.type>release</build.type>
+				<classifier/>
+			</properties>
+		</profile>
+	</profiles>
+
 </project>
