@@ -29,6 +29,7 @@ import ij.ImageStack;
 import ij.process.ByteProcessor;
 import ij.process.ImageConverter;
 import ij.process.ImageProcessor;
+import ij.process.ImageStatistics;
 import inra.ijpb.watershed.Watershed;
 
 import org.junit.Test;
@@ -50,6 +51,17 @@ public class TestWatershed2D {
 		return x;
 	}
 	
+	ImagePlus randomImage(int width, int height)
+	{
+		ImageProcessor ip = new ByteProcessor( width, height );
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++)
+				ip.setf(x, y, xorshift() % 2);
+		}
+
+		return new ImagePlus("", ip);
+	}
+
 	/**
 	 * Test 2D watershed over the same image stored as 8, 16 and 32-bit.
 	 */
@@ -68,11 +80,9 @@ public class TestWatershed2D {
 
 			ImageProcessor inputIP = input.getChannelProcessor();
 
-			ImageProcessor maskIP = new ByteProcessor( inputIP.getWidth(), inputIP.getHeight() );
-			for (int y = 0; y < input.getHeight(); y++) {
-				for (int x = 0; x < input.getWidth(); x++)
-					maskIP.setf(x, y, xorshift() % 2);
-			}
+			ImagePlus mask = randomImage( inputIP.getWidth(), inputIP.getHeight() );
+
+			ImageProcessor maskIP = mask.getChannelProcessor();
 
 			ImageProcessor resultIP8bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
 			ImagePlus result8bit = new ImagePlus("result", resultIP8bit);
@@ -100,6 +110,66 @@ public class TestWatershed2D {
 
 			assertEquals( "Different results for 8 and 32 bit images (connectivity = " + connectivity + ")",
 				0, diffImagePlus( result8bit, result32bit ) );
+		}
+	}
+
+	/**
+	 * Benchmark 2D watershed over the same image stored as 8, 16 and 32-bit.
+	 */
+	@Test
+	public void benchmarkWatershed()
+	{
+		for (int dim = 16; dim < 512 * 512; dim *= 2)
+		{
+			ImagePlus input = randomImage( dim, dim );
+
+			final ImagePlus copy = input.duplicate();
+		
+			int[] connectivityValues = new int[]{ 4, 8 };
+
+			for( int connectivity : connectivityValues )
+			{
+				input = copy;
+
+				ImageProcessor inputIP = input.getChannelProcessor();
+
+				ImagePlus mask = randomImage( inputIP.getWidth(), inputIP.getHeight() );
+				
+				ImageProcessor maskIP = mask.getChannelProcessor();
+
+				ImageProcessor resultIP8bit;
+				{
+					final long t0 = System.currentTimeMillis();
+					resultIP8bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
+					final long t1 = System.currentTimeMillis();
+					ImageStatistics stats = ImageStatistics.getStatistics(resultIP8bit);
+					IJ.log(dim + " " + connectivity + " " + "  8 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+				}
+
+				ImageConverter ic = new ImageConverter( input );
+				ic.convertToGray16();
+
+				ImageProcessor resultIP16bit;
+				{
+					final long t0 = System.currentTimeMillis();
+					resultIP16bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
+					final long t1 = System.currentTimeMillis();
+					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
+					IJ.log(dim + " " + connectivity + " " + " 16 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+				}
+
+				ic = new ImageConverter( input.duplicate() );
+				ic.convertToGray32();
+
+				ImageProcessor resultIP32bit;
+				{
+					final long t0 = System.currentTimeMillis();
+					resultIP32bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
+					final long t1 = System.currentTimeMillis();
+					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
+					IJ.log(dim + " " + connectivity + " " + " 32 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+				}
+			}
 		}
 	}
 
