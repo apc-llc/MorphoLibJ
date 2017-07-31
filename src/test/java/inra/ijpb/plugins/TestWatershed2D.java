@@ -119,7 +119,7 @@ public class TestWatershed2D {
 	@Test
 	public void benchmarkWatershed()
 	{
-		for (int dim = 16; dim <= 2048; dim *= 2)
+		for (int dim = 16; dim <= 8192; dim *= 2)
 		{
 			ImagePlus input = randomImage( dim, dim );
 
@@ -127,13 +127,13 @@ public class TestWatershed2D {
 		
 			int[] connectivityValues = new int[]{ 4, 8 };
 
+			ImagePlus mask = randomImage( dim, dim );
+
 			for( int connectivity : connectivityValues )
 			{
 				input = copy;
 
 				ImageProcessor inputIP = input.getChannelProcessor();
-
-				ImagePlus mask = randomImage( inputIP.getWidth(), inputIP.getHeight() );
 				
 				ImageProcessor maskIP = mask.getChannelProcessor();
 
@@ -145,6 +145,15 @@ public class TestWatershed2D {
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP8bit);
 					IJ.log(dim + " " + connectivity + " " + "  8 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
 				}
+			}
+
+			for( int connectivity : connectivityValues )
+			{
+				input = copy;
+
+				ImageProcessor inputIP = input.getChannelProcessor();
+				
+				ImageProcessor maskIP = mask.getChannelProcessor();
 
 				ImageConverter ic = new ImageConverter( input );
 				ic.convertToGray16();
@@ -157,8 +166,17 @@ public class TestWatershed2D {
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
 					IJ.log(dim + " " + connectivity + " " + " 16 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
 				}
+			}
 
-				ic = new ImageConverter( input.duplicate() );
+			for( int connectivity : connectivityValues )
+			{
+				input = copy;
+
+				ImageProcessor inputIP = input.getChannelProcessor();
+				
+				ImageProcessor maskIP = mask.getChannelProcessor();
+
+				ImageConverter ic = new ImageConverter( input );
 				ic.convertToGray32();
 
 				ImageProcessor resultIP32bit;
@@ -166,7 +184,7 @@ public class TestWatershed2D {
 					final long t0 = System.currentTimeMillis();
 					resultIP32bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
 					final long t1 = System.currentTimeMillis();
-					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
+					ImageStatistics stats = ImageStatistics.getStatistics(resultIP32bit);
 					IJ.log(dim + " " + connectivity + " " + " 32 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
 				}
 			}

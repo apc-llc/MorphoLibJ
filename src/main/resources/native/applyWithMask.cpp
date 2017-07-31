@@ -61,7 +61,7 @@ struct Cursor2D
 extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_applyWithMask(
 	JNIEnv *env, jclass object, jdouble hMin, jdouble hMax,
 	jint size1, jint size2, jint connectivity, jboolean verbose,
-	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jobjectArray tabLabelsObj,
+	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jobjectArray resultPixelsObj,
 	jint MASK, jint WSHED, jint INIT, jint INQUEUE)
 {
     int currentLabel = 0;
@@ -318,18 +318,33 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 	}
 
 	{
-		if( verbose ) IJ.log("  Converting tab labels to managed array..." );
+		if( verbose ) IJ.log("  Converting tab labels to resulting image pixels..." );
 		long t1 = System.currentTimeMillis();
-		IJ.showStatus("Converting tab labels to managed array...");
+		IJ.showStatus("Converting tab labels to resulting image pixels...");
+
+		vector<float> vrow(size2);
+		float* row = &vrow[0];
 
 		for (int i = 0; i < size1; i++)
 		{
-			jintArray jline = env->NewIntArray(size2);
-			env->SetIntArrayRegion(jline, 0, size2, &tabLabels[i * size2]);
-			env->SetObjectArrayElement(tabLabelsObj, i, jline);
-			env->DeleteLocalRef(jline);
-		}
+			jfloatArray rowObj = env->NewFloatArray(size2);
 
+			for (int j = 0; j < size2; j++)
+			{
+				int label = tabLabels[ i * size2 + j ];
+
+				if ( label == INIT) // set unlabeled pixels to 0
+					row[j] = 0;
+				else
+					row[j] = label;
+			}
+
+			env->SetFloatArrayRegion(rowObj, 0, size2, row);
+			env->SetObjectArrayElement(resultPixelsObj, i, rowObj);
+
+			env->DeleteLocalRef(rowObj);
+		}
+		
 	    long t2 = System.currentTimeMillis();
 	    stringstream ss;
 	    ss << "  Converting took " << (t2-t1) << " ms.";
