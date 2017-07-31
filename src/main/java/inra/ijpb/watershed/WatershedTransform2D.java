@@ -229,8 +229,7 @@ public class WatershedTransform2D
 	private static native void applyWithMask(
 			double hMin, double hMax,
 			int size1, int size2, int connectivity, boolean verbose,
-			ArrayList<PixelRecord> pixelList,
-			final int[][] tabLabels, ImageProcessor maskImage,
+			final float[][] imagePixels, final float[][] maskPixels, final int[][] tabLabels,
 			int MASK, int WSHED, int INIT, int INQUEUE);
 
 
@@ -259,22 +258,12 @@ public class WatershedTransform2D
 	    
 	    boolean flag = false;	    
 	    
-	    // Make list of pixels and sort it in ascending order
-	    IJ.showStatus( "Extracting pixel values..." );
-	    if( verbose ) IJ.log("  Extracting pixel values (h_min = " + hMin + ", h_max = " + hMax + ")..." );
-	    final long t0 = System.currentTimeMillis();
-
-	    // list of original pixels values and corresponding coordinates
-	    ArrayList<PixelRecord> pixelList = extractPixelValues( inputImage, hMin, hMax );
-
-	    final long t1 = System.currentTimeMillis();		
-	    if( verbose ) IJ.log("  Extraction took " + (t1-t0) + " ms.");
-
 	    // output labels
 	    final int[][] tabLabels = new int[ size1 ][ size2 ];
 	    
 	    applyWithMask(hMin, hMax, size1, size2, connectivity, verbose,
-			pixelList, tabLabels, maskImage, MASK, WSHED, INIT, INQUEUE);
+			inputImage.getFloatArray(), maskImage.getFloatArray(), tabLabels,
+			MASK, WSHED, INIT, INQUEUE);
 
 	    // Create result label image	    	
 		FloatProcessor fp = new FloatProcessor( size1, size2 );

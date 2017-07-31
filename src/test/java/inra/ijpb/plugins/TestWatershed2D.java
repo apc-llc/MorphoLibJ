@@ -119,7 +119,7 @@ public class TestWatershed2D {
 	@Test
 	public void benchmarkWatershed()
 	{
-		for (int dim = 16; dim < 512 * 512; dim *= 2)
+		for (int dim = 16; dim <= 2048; dim *= 2)
 		{
 			ImagePlus input = randomImage( dim, dim );
 

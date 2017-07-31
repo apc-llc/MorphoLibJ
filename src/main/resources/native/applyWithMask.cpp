@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <jni.h>
 #include <queue>
 #include <sstream>
@@ -42,6 +43,10 @@ struct Pixel
 		if (y != other.y)
 			return y < other.y;
 	}
+	
+	Pixel() : x(0), y(0), value(0.0) { }
+	
+	Pixel(int x_, int y_, double value_) : x(x_), y(y_), value(value_) { }
 };
 
 struct Cursor2D
@@ -56,47 +61,26 @@ struct Cursor2D
 extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_applyWithMask(
 	JNIEnv *env, jclass object, jdouble hMin, jdouble hMax,
 	jint size1, jint size2, jint connectivity, jboolean verbose,
-	jobject pixelListObj, jobjectArray tabLabelsObj, jobject maskImageObj,
+	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jobjectArray tabLabelsObj,
 	jint MASK, jint WSHED, jint INIT, jint INQUEUE)
 {
     int currentLabel = 0;
     
-    bool flag = false;	    
-
-	vector<Pixel> pixels;
+    bool flag = false;
+	
+	vector<float> maskPixels(size1 * size2);
 	{
-		if( verbose ) IJ.log("  Converting pixels list to native array..." );
+		if( verbose ) IJ.log("  Converting image mask to native array..." );
 		long t1 = System.currentTimeMillis();
-		IJ.showStatus("Converting pixels list to native array...");
+		IJ.showStatus("Converting image mask to native array...");
 
-		jclass arrayClass = env->FindClass("java/util/ArrayList");
-		jmethodID sizeMethodID = env->GetMethodID(arrayClass, "size", "()I");
-		jclass integerClass = env->FindClass("java/lang/Integer");
-		jmethodID intValueMethodID = env->GetMethodID(integerClass, "intValue", "()I");
-		jint size = env->CallIntMethod(pixelListObj, sizeMethodID);
-
-		pixels.resize(size);
-
-		jmethodID getMethodID = env->GetMethodID(arrayClass, "get", "(I)Ljava/lang/Object;");
-		jclass pixelRecordClass = env->FindClass("inra/ijpb/data/PixelRecord");
-		jfieldID valueFieldID = env->GetFieldID(pixelRecordClass, "value", "D");
-		jfieldID cursor2DFieldID = env->GetFieldID(pixelRecordClass, "cursor", "Linra/ijpb/data/Cursor2D;");
-		jclass cursor2DClass = env->FindClass("inra/ijpb/data/Cursor2D");
-		jmethodID getXMethodID = env->GetMethodID(cursor2DClass, "getX", "()I");
-		jmethodID getYMethodID = env->GetMethodID(cursor2DClass, "getY", "()I");
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size2; i++)
 		{
-			jobject element = env->CallObjectMethod(pixelListObj, getMethodID, i);
+			jfloatArray rowObj = (jfloatArray)env->GetObjectArrayElement(maskPixelsObj, i);
+			jfloat* row = env->GetFloatArrayElements(rowObj, 0);
+			memcpy(&maskPixels[i * size1], row, sizeof(float) * size1);
 			
-			Pixel& pixel = pixels[i];
-			pixel.value = env->GetDoubleField(element, valueFieldID);
-
-			jobject cursor;
-			cursor = env->GetObjectField(element, cursor2DFieldID);
-			pixel.x = env->CallIntMethod(cursor, getXMethodID);
-			pixel.y = env->CallIntMethod(cursor, getYMethodID);			
-
-			env->DeleteLocalRef(element);
+			env->DeleteLocalRef(rowObj);
 		}
 
 	    long t2 = System.currentTimeMillis();
@@ -104,25 +88,52 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 	    ss << "  Converting took " << (t2-t1) << " ms.";
 	    if( verbose ) IJ.log(ss.str());
 	}
-	
-	vector<float> maskImage(size1 * size2);
+
+	vector<Pixel> pixels(size1 * size2);
 	{
-		if( verbose ) IJ.log("  Converting mask image to native array..." );
+		vector<float> imagePixels(size1 * size2);
+		{
+			if( verbose ) IJ.log("  Converting image pixels to native array..." );
+			long t1 = System.currentTimeMillis();
+			IJ.showStatus("Converting image pixels to native array...");
+
+			for (int i = 0; i < size2; i++)
+			{
+				jfloatArray rowObj = (jfloatArray)env->GetObjectArrayElement(imagePixelsObj, i);
+				jfloat* row = env->GetFloatArrayElements(rowObj, 0);
+				memcpy(&imagePixels[i * size1], row, sizeof(float) * size1);
+
+				env->DeleteLocalRef(rowObj);
+			}
+
+			long t2 = System.currentTimeMillis();
+			stringstream ss;
+			ss << "  Converting took " << (t2-t1) << " ms.";
+			if( verbose ) IJ.log(ss.str());
+		}
+
+		if( verbose ) IJ.log("  Filtering masked pixels..." );
+		IJ.showStatus("Sorting pixels by value...");
 		long t1 = System.currentTimeMillis();
-		IJ.showStatus("Converting mask image to native array...");
+	
+		int nfiltered = 0;
+		
+		for (int j = 0; j < size2; j++)
+			for (int i = 0; i < size1; i++)
+				if (maskPixels[j * size1 + i])
+				{
+					double h = imagePixels[j * size1 + i];
+					if ((h > 0) && (h >= hMin) && (h <= hMax))
+						pixels[nfiltered++] = Pixel(j, i, imagePixels[j * size1 + i]);
+				}
+		
+		pixels.resize(nfiltered);
 
-		jclass imageProcessorClass = env->FindClass("ij/process/ImageProcessor");
-		jmethodID getfMethodID = env->GetMethodID(imageProcessorClass, "getf", "(II)F"); 
-
-		for (int i = 0; i < size1; i++)
-			for (int j = 0; j < size2; j++)
-				maskImage[i * size2 + j] = env->CallFloatMethod(maskImageObj, getfMethodID, i, j);
-
-	    long t2 = System.currentTimeMillis();
-	    stringstream ss;
-	    ss << "  Converting took " << (t2-t1) << " ms.";
-	    if( verbose ) IJ.log(ss.str());
-	}	
+		long t2 = System.currentTimeMillis();
+		stringstream ss;
+		ss << "  Filtering took " << (t2-t1) << " ms.";
+		if( verbose ) IJ.log(ss.str());
+	}
 
 	{
 		if( verbose ) IJ.log("  Sorting pixels by value..." );
@@ -194,7 +205,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 					// initialize queue with neighbors at level h of current basins or watersheds
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2
-						&& tabLabels[ u * size2 + v ] >= WSHED && maskImage[ u * size2 + v ] > 0)
+						&& tabLabels[ u * size2 + v ] >= WSHED && maskPixels[ u * size2 + v ] > 0)
 					//	&&  ( tabLabels[ u ][ v ] > 0 || tabLabels[ u ][ v ] == WSHED ) )
 					{
 						fifo.push(Cursor2D(i, j));
@@ -219,7 +230,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 					int u = i + neighs[k].x;
 					int v = j + neighs[k].y;
 
-					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskImage[ u * size2 + v ] > 0)
+					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskPixels[ u * size2 + v ] > 0)
 					{
 						if ( tabLabels[ u * size2 + v ] > 0 ) // i.e. the pixel belongs to an already labeled basin
 						{
@@ -284,7 +295,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 							int v = p2.y + neighs[k].y;
 
 							if ( u >= 0 && u < size1 && v >= 0 && v < size2
-								&& tabLabels[ u * size2 + v ] == MASK && maskImage[ u * size2 + v ] > 0)
+								&& tabLabels[ u * size2 + v ] == MASK && maskPixels[ u * size2 + v ] > 0)
 							{
 								fifo.push(Cursor2D(u, v));
 								tabLabels[ u * size2 + v ] = currentLabel;
