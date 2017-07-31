@@ -229,7 +229,7 @@ public class WatershedTransform2D
 	private static native void applyWithMask(
 			double hMin, double hMax,
 			int size1, int size2, int connectivity, boolean verbose,
-			final float[][] imagePixels, final float[][] maskPixels, final float[][] resultPixels,
+			final float[][] imagePixels, final float[][] maskPixels, final float[] resultPixels,
 			int MASK, int WSHED, int INIT, int INQUEUE);
 
 
@@ -259,7 +259,7 @@ public class WatershedTransform2D
 	    boolean flag = false;	    
 	    
 	    // output labels
-	    final float[][] outputPixels = new float[ size1 ][ size2 ];
+	    final float[] outputPixels = new float[ size1 * size2 ];
 	    
 	    applyWithMask(hMin, hMax, size1, size2, connectivity, verbose,
 			inputImage.getFloatArray(), maskImage.getFloatArray(), outputPixels,
@@ -267,7 +267,10 @@ public class WatershedTransform2D
 
 	    // Create result label image	    	
 		FloatProcessor fp = new FloatProcessor( size1, size2 );
-		fp.setFloatArray(outputPixels);
+
+		for (int y = 0; y < size1; y++)
+			for (int x = 0; x < size2; x++)
+				fp.setf(x, y, outputPixels[x + size2 * y]);
 
 	    return fp;
 	}

@@ -61,7 +61,7 @@ struct Cursor2D
 extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_applyWithMask(
 	JNIEnv *env, jclass object, jdouble hMin, jdouble hMax,
 	jint size1, jint size2, jint connectivity, jboolean verbose,
-	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jobjectArray resultPixelsObj,
+	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jfloatArray resultPixelsObj,
 	jint MASK, jint WSHED, jint INIT, jint INQUEUE)
 {
     int currentLabel = 0;
@@ -147,7 +147,9 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
     }
 
 	// value INIT is assigned to each pixel of the output labels
-	vector<int> tabLabels(size1 * size2, INIT);
+	int* tabLabels = (int*)env->GetFloatArrayElements(resultPixelsObj, 0);
+	for (int i = 0, e = size1 * size2; i < e; i++)
+		tabLabels[i] = INIT;
 	{
 		IJ.log( "  Flooding..." );
 		IJ.showStatus( "Flooding..." );
@@ -195,7 +197,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 				const int& j = pixel.y;
 				
 				// set label to MASK
-				tabLabels[ i * size2 + j ] = MASK;
+				tabLabels[ j * size1 + i ] = MASK;
 
 				// read neighbor coordinates
 				for (int k = 0; k < connectivity; k++)
@@ -205,11 +207,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 					// initialize queue with neighbors at level h of current basins or watersheds
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2
-						&& tabLabels[ u * size2 + v ] >= WSHED && maskPixels[ u * size2 + v ] > 0)
-					//	&&  ( tabLabels[ u ][ v ] > 0 || tabLabels[ u ][ v ] == WSHED ) )
+						&& tabLabels[ v * size1 + u ] >= WSHED && maskPixels[ u * size2 + v ] > 0)
+					//	&&  ( tabLabels[ v * size1 + u ] > 0 || tabLabels[ v * size1 + u ] == WSHED ) )
 					{
 						fifo.push(Cursor2D(i, j));
-						tabLabels[ i * size2 + j ] = INQUEUE;
+						tabLabels[ j * size1 + i ] = INQUEUE;
 						break;
 					}
 				}// end for
@@ -232,29 +234,29 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskPixels[ u * size2 + v ] > 0)
 					{
-						if ( tabLabels[ u * size2 + v ] > 0 ) // i.e. the pixel belongs to an already labeled basin
+						if ( tabLabels[ v * size1 + u ] > 0 ) // i.e. the pixel belongs to an already labeled basin
 						{
-							if ( tabLabels[ i * size2 + j ] == INQUEUE || (tabLabels[ i * size2 + j ] == WSHED && flag == true ) )
+							if ( tabLabels[ j * size1 + i ] == INQUEUE || (tabLabels[ j * size1 + i ] == WSHED && flag == true ) )
 							{
-								tabLabels[ i * size2 + j ] = tabLabels[ u * size2 + v ];
+								tabLabels[ j * size1 + i ] = tabLabels[ v * size1 + u ];
 							}
-							else if ( tabLabels[ i * size2 + j ] > 0 && tabLabels[ i * size2 + j ] != tabLabels[ u * size2 + v ] )
+							else if ( tabLabels[ j * size2 + i ] > 0 && tabLabels[ j * size2 + i ] != tabLabels[ v * size1 + u ] )
 							{
-								tabLabels[ i * size2 + j ] = WSHED;
+								tabLabels[ j * size1 + i ] = WSHED;
 								flag = false;
 							}
 						}
-						else if ( tabLabels[ u * size2 + v ] == WSHED )
+						else if ( tabLabels[ v * size1 + u ] == WSHED )
 						{
-							if( tabLabels[ i * size2 + j ] == INQUEUE )
+							if( tabLabels[ j * size1 + i ] == INQUEUE )
 							{
-								tabLabels[ i * size2 + j ] = WSHED;
+								tabLabels[ j * size1 + i ] = WSHED;
 								flag = true;
 							}
 						}
-						else if ( tabLabels[ u * size2 + v ] == MASK )
+						else if ( tabLabels[ v * size1 + u ] == MASK )
 						{
-							tabLabels[ u * size2 + v ] = INQUEUE;
+							tabLabels[ v * size1 + u ] = INQUEUE;
 							fifo.push(Cursor2D(u, v));
 						}
 					}
@@ -277,11 +279,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 				const int& i = pixel.x;
 				const int& j = pixel.y;
 
-				if ( tabLabels[ i * size2 + j ] == MASK ) // the pixel is inside a new minimum
+				if ( tabLabels[ j * size1 + i ] == MASK ) // the pixel is inside a new minimum
 				{
 					currentLabel ++;
 					fifo.push(Cursor2D(i, j));
-					tabLabels[ i * size2 + j ] = currentLabel;
+					tabLabels[ j * size1 + i ] = currentLabel;
 					
 					while( fifo.empty() == false )
 					{
@@ -295,10 +297,10 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 							int v = p2.y + neighs[k].y;
 
 							if ( u >= 0 && u < size1 && v >= 0 && v < size2
-								&& tabLabels[ u * size2 + v ] == MASK && maskPixels[ u * size2 + v ] > 0)
+								&& tabLabels[ v * size1 + u ] == MASK && maskPixels[ u * size2 + v ] > 0)
 							{
 								fifo.push(Cursor2D(u, v));
-								tabLabels[ u * size2 + v ] = currentLabel;
+								tabLabels[ v * size1 + u ] = currentLabel;
 							}
 						}// end for
 					}// end while
@@ -322,29 +324,26 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		long t1 = System.currentTimeMillis();
 		IJ.showStatus("Converting tab labels to resulting image pixels...");
 
-		vector<float> vrow(size2);
-		float* row = &vrow[0];
+		// For speed, the resulting pixels array is mapped to the same storage as used for tabLabels.
+		// Of course, this assumes sizeof(int) = sizeof(float).
+		float* resultPixels = (float*)tabLabels;
 
-		for (int i = 0; i < size1; i++)
+		for (int j = 0; j < size2; j++)
 		{
-			jfloatArray rowObj = env->NewFloatArray(size2);
-
-			for (int j = 0; j < size2; j++)
+			for (int i = 0; i < size1; i++)
 			{
-				int label = tabLabels[ i * size2 + j ];
+				float* resultPixel = &resultPixels[ j * size1 + i ];
+				int label = *(int*)resultPixel;
 
 				if ( label == INIT) // set unlabeled pixels to 0
-					row[j] = 0;
+					*resultPixel = 0;
 				else
-					row[j] = label;
+					*resultPixel = label;
 			}
-
-			env->SetFloatArrayRegion(rowObj, 0, size2, row);
-			env->SetObjectArrayElement(resultPixelsObj, i, rowObj);
-
-			env->DeleteLocalRef(rowObj);
 		}
 		
+		env->ReleaseFloatArrayElements(resultPixelsObj, resultPixels, 0);
+
 	    long t2 = System.currentTimeMillis();
 	    stringstream ss;
 	    ss << "  Converting took " << (t2-t1) << " ms.";
