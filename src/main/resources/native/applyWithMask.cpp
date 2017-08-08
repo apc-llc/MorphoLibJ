@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <jni.h>
@@ -34,6 +35,10 @@ struct Pixel
 	
 	bool operator<(const Pixel& other)
 	{
+		// Special case: https://docs.oracle.com/javase/7/docs/api/java/lang/Double.html#equals(java.lang.Object)
+		if (signbit(value) && !signbit(other.value))
+			return true;
+
 		if (value != other.value)
 			return value < other.value;
 		
@@ -120,12 +125,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		
 		for (int j = 0; j < size2; j++)
 			for (int i = 0; i < size1; i++)
-				if (maskPixels[j * size1 + i])
-				{
-					double h = imagePixels[j * size1 + i];
-					if ((h > 0) && (h >= hMin) && (h <= hMax))
-						pixels[nfiltered++] = Pixel(j, i, imagePixels[j * size1 + i]);
-				}
+			{
+				double h = imagePixels[j * size1 + i];
+				if ((maskPixels[j * size1 + i] > 0) && (h >= hMin) && (h <= hMax))
+					pixels[nfiltered++] = Pixel(j, i, imagePixels[j * size1 + i]);
+			}
 		
 		pixels.resize(nfiltered);
 

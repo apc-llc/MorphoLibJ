@@ -32,6 +32,9 @@ import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import inra.ijpb.watershed.Watershed;
 
+import java.util.Map;
+import java.util.HashMap;
+
 import org.junit.Test;
 
 public class TestWatershed2D {
@@ -119,7 +122,63 @@ public class TestWatershed2D {
 	@Test
 	public void benchmarkWatershed()
 	{
-		for (int dim = 16; dim <= 8192; dim *= 2)
+		Map<String, Double> means = new HashMap<>();
+		means.put("[16][4][8]", 3.87890625);
+		means.put("[16][8][8]", 2.375);
+		means.put("[16][4][16]", 3.87890625);
+		means.put("[16][8][16]", 2.375);
+		means.put("[16][4][32]", 3.87890625);
+		means.put("[16][8][32]", 2.375);
+		means.put("[32][4][8]", 14.978515625);
+		means.put("[32][8][8]", 9.8740234375);
+		means.put("[32][4][16]", 14.978515625);
+		means.put("[32][8][16]", 9.8740234375);
+		means.put("[32][4][32]", 14.978515625);
+		means.put("[32][8][32]", 9.8740234375);
+		means.put("[64][4][8]", 65.816162109375);
+		means.put("[64][8][8]", 36.99169921875);
+		means.put("[64][4][16]", 65.816162109375);
+		means.put("[64][8][16]", 36.99169921875);
+		means.put("[64][4][32]", 65.816162109375);
+		means.put("[64][8][32]", 36.99169921875);
+		means.put("[128][4][8]", 262.84185791015625);
+		means.put("[128][8][8]", 143.35784912109375);
+		means.put("[128][4][16]", 262.84185791015625);
+		means.put("[128][8][16]", 143.35784912109375);
+		means.put("[128][4][32]", 262.84185791015625);
+		means.put("[128][8][32]", 143.35784912109375);
+		means.put("[256][4][8]", 1032.5812225341797);
+		means.put("[256][8][8]", 565.5418853759766);
+		means.put("[256][4][16]", 1032.5812225341797);
+		means.put("[256][8][16]", 565.5418853759766);
+		means.put("[256][4][32]", 1032.5812225341797);
+		means.put("[256][8][32]", 565.5418853759766);
+		means.put("[512][4][8]", 4161.341079711914);
+		means.put("[512][8][8]", 2318.1643676757812);
+		means.put("[512][4][16]", 4161.341079711914);
+		means.put("[512][8][16]", 2318.1643676757812);
+		means.put("[512][4][32]", 4161.341079711914);
+		means.put("[512][8][32]", 2318.1643676757812);
+		means.put("[1024][4][8]", 16581.678923606873);
+		means.put("[1024][8][8]", 9277.968538284302);
+		means.put("[1024][4][16]", 16581.678923606873);
+		means.put("[1024][8][16]", 9277.968538284302);
+		means.put("[1024][4][32]", 16581.678923606873);
+		means.put("[1024][8][32]", 9277.968538284302);
+		means.put("[2048][4][8]", 66414.02896332741);
+		means.put("[2048][8][8]", 36933.99206995964);
+		means.put("[2048][4][16]", 66414.02896332741);
+		means.put("[2048][8][16]", 36933.99206995964);
+		means.put("[2048][4][32]", 66414.02896332741);
+		means.put("[2048][8][32]", 36933.99206995964);
+		means.put("[4096][4][8]", 264885.5006724596);
+		means.put("[4096][8][8]", 147389.29292684793);
+		means.put("[4096][4][16]", 264885.5006724596);
+		means.put("[4096][8][16]", 147389.29292684793);
+		means.put("[4096][4][32]", 264885.5006724596);
+		means.put("[4096][8][32]", 147389.3791937232);
+
+		for (int dim = 16; dim <= 4096; dim *= 2)
 		{
 			ImagePlus input = randomImage( dim, dim );
 
@@ -143,7 +202,9 @@ public class TestWatershed2D {
 					resultIP8bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
 					final long t1 = System.currentTimeMillis();
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP8bit);
-					IJ.log(dim + " " + connectivity + " " + "  8 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+					IJ.log(dim + " " + connectivity + " " + "  8 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
+					assertEquals( "Different results for 8 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
+						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][8]").doubleValue()), 0);
 				}
 			}
 
@@ -164,7 +225,9 @@ public class TestWatershed2D {
 					resultIP16bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
 					final long t1 = System.currentTimeMillis();
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
-					IJ.log(dim + " " + connectivity + " " + " 16 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+					IJ.log(dim + " " + connectivity + " " + " 16 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
+					assertEquals( "Different results for 16 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
+						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][16]").doubleValue()), 0);
 				}
 			}
 
@@ -185,7 +248,9 @@ public class TestWatershed2D {
 					resultIP32bit = Watershed.computeWatershed( inputIP, maskIP, connectivity );
 					final long t1 = System.currentTimeMillis();
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP32bit);
-					IJ.log(dim + " " + connectivity + " " + " 32 bit " + (t1 - t0) / 1000.0 + " " + stats.mean);
+					IJ.log(dim + " " + connectivity + " " + " 32 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
+					assertEquals( "Different results for32 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
+						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][32]").doubleValue()), 0);
 				}
 			}
 		}
