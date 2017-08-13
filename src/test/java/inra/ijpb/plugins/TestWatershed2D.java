@@ -176,7 +176,7 @@ public class TestWatershed2D {
 		means.put("[4096][4][16]", 264885.5006724596);
 		means.put("[4096][8][16]", 147389.29292684793);
 		means.put("[4096][4][32]", 264885.5006724596);
-		means.put("[4096][8][32]", 147389.3791937232);
+		means.put("[4096][8][32]", 147368.07854491472);
 
 		for (int dim = 16; dim <= 4096; dim *= 2)
 		{
@@ -204,7 +204,7 @@ public class TestWatershed2D {
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP8bit);
 					IJ.log(dim + " " + connectivity + " " + "  8 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
 					assertEquals( "Different results for 8 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
-						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][8]").doubleValue()), 0);
+						0, Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][8]").doubleValue()));
 				}
 			}
 
@@ -227,7 +227,7 @@ public class TestWatershed2D {
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP16bit);
 					IJ.log(dim + " " + connectivity + " " + " 16 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
 					assertEquals( "Different results for 16 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
-						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][16]").doubleValue()), 0);
+						0, Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][16]").doubleValue()));
 				}
 			}
 
@@ -250,7 +250,7 @@ public class TestWatershed2D {
 					ImageStatistics stats = ImageStatistics.getStatistics(resultIP32bit);
 					IJ.log(dim + " " + connectivity + " " + " 32 bit " + (t1 - t0) / 1000.0 + " sec mean = " + stats.mean);
 					assertEquals( "Different results for32 bit image of size = " + dim + " (connectivity = " + connectivity + ")",
-						Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][32]").doubleValue()), 0);
+						0, Double.compare(stats.mean, means.get("[" + dim + "][" + connectivity + "][32]").doubleValue()));
 				}
 			}
 		}

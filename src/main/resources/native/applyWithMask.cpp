@@ -149,7 +149,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		ss << "  Sorting took " << (t2-t1) << " ms.";
 		if( verbose ) IJ.log(ss.str());
     }
-
+    
 	// value INIT is assigned to each pixel of the output labels
 	int* tabLabels = (int*)env->GetFloatArrayElements(resultPixelsObj, 0);
 	for (int i = 0, e = size1 * size2; i < e; i++)
@@ -166,19 +166,23 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		queue<Cursor2D> fifo;
 
 		vector<Cursor2D> neighs(8);
-		if (connectivity >= 4)
+		if (connectivity == 4)
 		{
-			neighs[0] = Cursor2D(-1, 0);
-			neighs[1] = Cursor2D(1, 0);
-			neighs[2] = Cursor2D(0, -1);
-			neighs[3] = Cursor2D(0, 1); 
+			neighs[0] = Cursor2D(-1,  0);
+			neighs[1] = Cursor2D( 0, -1);
+			neighs[2] = Cursor2D( 1,  0);
+			neighs[3] = Cursor2D( 0,  1);
 		}
-		if (connectivity == 8)
+		else if (connectivity == 8)
 		{
-			neighs[4] = Cursor2D(1, 1);
-			neighs[5] = Cursor2D(-1, 1);
-			neighs[6] = Cursor2D(1, -1);
-			neighs[7] = Cursor2D(-1, -1); 
+			neighs[0] = Cursor2D(-1, -1);
+			neighs[1] = Cursor2D(-1,  0);
+			neighs[2] = Cursor2D(-1,  1);
+			neighs[3] = Cursor2D( 0, -1);
+			neighs[4] = Cursor2D( 0,  1);
+			neighs[5] = Cursor2D( 1, -1);
+			neighs[6] = Cursor2D( 1,  0);
+			neighs[7] = Cursor2D( 1,  1);
 		}
 
 		// for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
