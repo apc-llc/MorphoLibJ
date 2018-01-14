@@ -72,8 +72,9 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
     int currentLabel = 0;
     
     bool flag = false;
-	
-	vector<float> maskPixels(size1 * size2);
+
+	vector<jfloatArray> rowObjs(size2);
+	vector<float*> maskPixels(size2);
 	{
 		if( verbose ) IJ.log("  Converting image mask to native array..." );
 		long t1 = System.currentTimeMillis();
@@ -82,10 +83,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		for (int i = 0; i < size2; i++)
 		{
 			jfloatArray rowObj = (jfloatArray)env->GetObjectArrayElement(maskPixelsObj, i);
-			jfloat* row = env->GetFloatArrayElements(rowObj, 0);
-			memcpy(&maskPixels[i * size1], row, sizeof(float) * size1);
-			
-			env->DeleteLocalRef(rowObj);
+			maskPixels[i] = (float*)env->GetFloatArrayElements(rowObj, 0);
+			rowObjs[i] = rowObj;
 		}
 
 	    long t2 = System.currentTimeMillis();
@@ -127,7 +126,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 			for (int i = 0; i < size1; i++)
 			{
 				double h = imagePixels[j * size1 + i];
-				if ((maskPixels[j * size1 + i] > 0) && (h >= hMin) && (h <= hMax))
+				if ((maskPixels[j][i] > 0) && (h >= hMin) && (h <= hMax))
 					pixels[nfiltered++] = Pixel(j, i, imagePixels[j * size1 + i]);
 			}
 		
@@ -152,8 +151,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
     
 	// value INIT is assigned to each pixel of the output labels
 	int* tabLabels = (int*)env->GetFloatArrayElements(resultPixelsObj, 0);
-	for (int i = 0, e = size1 * size2; i < e; i++)
-		tabLabels[i] = INIT;
+	{
+		for (int i = 0, e = size1 * size2; i < e; i++)
+			tabLabels[i] = INIT;
+	}
+
 	{
 		IJ.log( "  Flooding..." );
 		IJ.showStatus( "Flooding..." );
@@ -190,7 +192,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		{
 			double h = pixels[currentIndex].value;
 
-			for(int pixelIndex = heightIndex1, e = pixels.size(); pixelIndex < e; pixelIndex ++)
+			for(int pixelIndex = heightIndex1, e = pixels.size(); pixelIndex < e; pixelIndex++)
 			{
 				const Pixel& pixel = pixels[pixelIndex];
 
@@ -215,7 +217,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 					// initialize queue with neighbors at level h of current basins or watersheds
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2
-						&& tabLabels[ v * size1 + u ] >= WSHED && maskPixels[ u * size2 + v ] > 0)
+						&& tabLabels[ v * size1 + u ] >= WSHED && maskPixels[u][v] > 0)
 					//	&&  ( tabLabels[ v * size1 + u ] > 0 || tabLabels[ v * size1 + u ] == WSHED ) )
 					{
 						fifo.push(Cursor2D(i, j));
@@ -240,7 +242,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 					int u = i + neighs[k].x;
 					int v = j + neighs[k].y;
 
-					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskPixels[ u * size2 + v ] > 0)
+					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskPixels[u][v] > 0)
 					{
 						if ( tabLabels[ v * size1 + u ] > 0 ) // i.e. the pixel belongs to an already labeled basin
 						{
@@ -248,7 +250,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 							{
 								tabLabels[ j * size1 + i ] = tabLabels[ v * size1 + u ];
 							}
-							else if ( tabLabels[ j * size2 + i ] > 0 && tabLabels[ j * size2 + i ] != tabLabels[ v * size1 + u ] )
+							else if ( tabLabels[ j * size1 + i ] > 0 && tabLabels[ j * size1 + i ] != tabLabels[ v * size1 + u ] )
 							{
 								tabLabels[ j * size1 + i ] = WSHED;
 								flag = false;
@@ -273,7 +275,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 			// check for new minima at level h
 			
-			for(int pixelIndex = heightIndex2, e = pixels.size(); pixelIndex < e; pixelIndex ++, currentIndex++)
+			for(int pixelIndex = heightIndex2, e = pixels.size(); pixelIndex < e; pixelIndex++, currentIndex++)
 			{
 				const Pixel& pixel = pixels[pixelIndex];
 				
@@ -289,7 +291,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 				if ( tabLabels[ j * size1 + i ] == MASK ) // the pixel is inside a new minimum
 				{
-					currentLabel ++;
+					currentLabel++;
 					fifo.push(Cursor2D(i, j));
 					tabLabels[ j * size1 + i ] = currentLabel;
 					
@@ -305,7 +307,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 							int v = p2.y + neighs[k].y;
 
 							if ( u >= 0 && u < size1 && v >= 0 && v < size2
-								&& tabLabels[ v * size1 + u ] == MASK && maskPixels[ u * size2 + v ] > 0)
+								&& tabLabels[ v * size1 + u ] == MASK && maskPixels[u][v] > 0)
 							{
 								fifo.push(Cursor2D(u, v));
 								tabLabels[ v * size1 + u ] = currentLabel;
@@ -325,6 +327,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		stringstream ss;
 		ss << "  Flooding took: " << (end-start) << " ms";
 		if( verbose ) IJ.log(ss.str());
+	}
+
+	{
+		for (int i = 0; i < size2; i++)
+			env->DeleteLocalRef(rowObjs[i]);
 	}
 
 	{
