@@ -73,7 +73,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
     
     bool flag = false;
 
-	vector<jfloatArray> rowObjs(size2);
+	vector<jfloatArray> maskPixelRowObjs(size2);
 	vector<float*> maskPixels(size2);
 	{
 		if( verbose ) IJ.log("  Converting image mask to native array..." );
@@ -84,7 +84,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		{
 			jfloatArray rowObj = (jfloatArray)env->GetObjectArrayElement(maskPixelsObj, i);
 			maskPixels[i] = (float*)env->GetFloatArrayElements(rowObj, 0);
-			rowObjs[i] = rowObj;
+			maskPixelRowObjs[i] = rowObj;
 		}
 
 	    long t2 = System.currentTimeMillis();
@@ -93,9 +93,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 	    if( verbose ) IJ.log(ss.str());
 	}
 
+	int npixels = 0;
 	vector<Pixel> pixels(size1 * size2);
 	{
-		vector<float> imagePixels(size1 * size2);
+		vector<jfloatArray> imagePixelsRowObjs(size2);
+		vector<float*> imagePixels(size2);
 		{
 			if( verbose ) IJ.log("  Converting image pixels to native array..." );
 			long t1 = System.currentTimeMillis();
@@ -104,10 +106,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 			for (int i = 0; i < size2; i++)
 			{
 				jfloatArray rowObj = (jfloatArray)env->GetObjectArrayElement(imagePixelsObj, i);
-				jfloat* row = env->GetFloatArrayElements(rowObj, 0);
-				memcpy(&imagePixels[i * size1], row, sizeof(float) * size1);
-
-				env->DeleteLocalRef(rowObj);
+				imagePixels[i] = (float*)env->GetFloatArrayElements(rowObj, 0);
+				imagePixelsRowObjs[i] = rowObj;
 			}
 
 			long t2 = System.currentTimeMillis();
@@ -119,19 +119,18 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		if( verbose ) IJ.log("  Filtering masked pixels..." );
 		IJ.showStatus("Sorting pixels by value...");
 		long t1 = System.currentTimeMillis();
-	
-		int nfiltered = 0;
 		
 		for (int j = 0; j < size2; j++)
 			for (int i = 0; i < size1; i++)
 			{
-				double h = imagePixels[j * size1 + i];
+				double h = imagePixels[j][i];
 				if ((maskPixels[j][i] > 0) && (h >= hMin) && (h <= hMax))
-					pixels[nfiltered++] = Pixel(j, i, imagePixels[j * size1 + i]);
+					pixels[npixels++] = Pixel(j, i, h);
 			}
-		
-		pixels.resize(nfiltered);
 
+		for (int i = 0; i < size2; i++)
+			env->DeleteLocalRef(imagePixelsRowObjs[i]);
+		
 		long t2 = System.currentTimeMillis();
 		stringstream ss;
 		ss << "  Filtering took " << (t2-t1) << " ms.";
@@ -142,7 +141,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		if( verbose ) IJ.log("  Sorting pixels by value..." );
 		IJ.showStatus("Sorting pixels by value...");
 		long t1 = System.currentTimeMillis();
-		sort(pixels.begin(), pixels.end());
+		sort(pixels.begin(), pixels.begin() + npixels);
 		long t2 = System.currentTimeMillis();
 		stringstream ss;
 		ss << "  Sorting took " << (t2-t1) << " ms.";
@@ -188,11 +187,11 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		}
 
 		// for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
-		while( currentIndex < pixels.size() )
+		while( currentIndex < npixels )
 		{
 			double h = pixels[currentIndex].value;
 
-			for(int pixelIndex = heightIndex1, e = pixels.size(); pixelIndex < e; pixelIndex++)
+			for(int pixelIndex = heightIndex1, e = npixels; pixelIndex < e; pixelIndex++)
 			{
 				const Pixel& pixel = pixels[pixelIndex];
 
@@ -275,7 +274,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 			// check for new minima at level h
 			
-			for(int pixelIndex = heightIndex2, e = pixels.size(); pixelIndex < e; pixelIndex++, currentIndex++)
+			for(int pixelIndex = heightIndex2, e = npixels; pixelIndex < e; pixelIndex++, currentIndex++)
 			{
 				const Pixel& pixel = pixels[pixelIndex];
 				
@@ -331,7 +330,7 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 
 	{
 		for (int i = 0; i < size2; i++)
-			env->DeleteLocalRef(rowObjs[i]);
+			env->DeleteLocalRef(maskPixelRowObjs[i]);
 	}
 
 	{
