@@ -404,6 +404,14 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 							</execution>
 						</executions>
 					</plugin>
+
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<argLine>-Xmx4096m</argLine>
+						</configuration>
+					</plugin>
 				</plugins>
 			</build>
 			<properties>
@@ -413,5 +421,4 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 			</properties>
 		</profile>
 	</profiles>
-
 </project>
