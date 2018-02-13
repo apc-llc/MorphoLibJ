@@ -63,9 +63,12 @@ struct Cursor2D
 	Cursor2D(int x_, int y_) : x(x_), y(y_) { }
 };
 
-extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_applyWithMask(
+template<int connectivity,
+	int NX0, int NX1, int NX2, int NX3, int NX4, int NX5, int NX6, int NX7,
+	int NY0, int NY1, int NY2, int NY3, int NY4, int NY5, int NY6, int NY7>
+static void applyWithMask(
 	JNIEnv *env, jclass object, jdouble hMin, jdouble hMax,
-	jint size1, jint size2, jint connectivity, jboolean verbose,
+	jint size1, jint size2, jboolean verbose,
 	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jfloatArray resultPixelsObj,
 	jint MASK, jint WSHED, jint INIT, jint INQUEUE)
 {
@@ -166,25 +169,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 		
 		queue<Cursor2D> fifo;
 
-		vector<Cursor2D> neighs(8);
-		if (connectivity == 4)
-		{
-			neighs[0] = Cursor2D(-1,  0);
-			neighs[1] = Cursor2D( 0, -1);
-			neighs[2] = Cursor2D( 1,  0);
-			neighs[3] = Cursor2D( 0,  1);
-		}
-		else if (connectivity == 8)
-		{
-			neighs[0] = Cursor2D(-1, -1);
-			neighs[1] = Cursor2D(-1,  0);
-			neighs[2] = Cursor2D(-1,  1);
-			neighs[3] = Cursor2D( 0, -1);
-			neighs[4] = Cursor2D( 0,  1);
-			neighs[5] = Cursor2D( 1, -1);
-			neighs[6] = Cursor2D( 1,  0);
-			neighs[7] = Cursor2D( 1,  1);
-		}
+		const int neighsx[] = { NX0, NX1, NX2, NX3, NX4, NX5, NX6, NX7 };
+		const int neighsy[] = { NY0, NY1, NY2, NY3, NY4, NY5, NY6, NY7 };
 
 		// for h <- h_min to h_max; geodesic SKIZ of level h-1 inside level h
 		while( currentIndex < npixels )
@@ -211,8 +197,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 				// read neighbor coordinates
 				for (int k = 0; k < connectivity; k++)
 				{
-					int u = i + neighs[k].x;
-					int v = j + neighs[k].y;
+					int u = i + neighsx[k];
+					int v = j + neighsy[k];
 
 					// initialize queue with neighbors at level h of current basins or watersheds
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2
@@ -238,8 +224,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 				for(int k = 0; k < connectivity; k++)
 				{
 					// labeling current point by inspecting neighbors
-					int u = i + neighs[k].x;
-					int v = j + neighs[k].y;
+					int u = i + neighsx[k];
+					int v = j + neighsy[k];
 
 					if ( u >= 0 && u < size1 && v >= 0 && v < size2 && maskPixels[u][v] > 0)
 					{
@@ -302,8 +288,8 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 						// read neighbor coordinates
 						for (int k = 0; k < connectivity; k++)
 						{
-							int u = p2.x + neighs[k].x;
-							int v = p2.y + neighs[k].y;
+							int u = p2.x + neighsx[k];
+							int v = p2.y + neighsy[k];
 
 							if ( u >= 0 && u < size1 && v >= 0 && v < size2
 								&& tabLabels[ v * size1 + u ] == MASK && maskPixels[u][v] > 0)
@@ -363,5 +349,21 @@ extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_
 	    ss << "  Converting took " << (t2-t1) << " ms.";
 	    if( verbose ) IJ.log(ss.str());
 	}
+}
+
+extern "C" JNIEXPORT void JNICALL Java_inra_ijpb_watershed_WatershedTransform2D_applyWithMask(
+	JNIEnv *env, jclass object, jdouble hMin, jdouble hMax,
+	jint size1, jint size2, jint connectivity, jboolean verbose,
+	jobjectArray imagePixelsObj, jobjectArray maskPixelsObj, jfloatArray resultPixelsObj,
+	jint MASK, jint WSHED, jint INIT, jint INQUEUE)
+{
+	if (connectivity == 4)
+		applyWithMask<4, -1,  0,  1,  0,  0,  0,  0,  0,  0, -1,  0,  1,  0,  0,  0,  0>(
+			env, object, hMin, hMax, size1, size2, verbose,
+			imagePixelsObj, maskPixelsObj, resultPixelsObj, MASK, WSHED, INIT, INQUEUE);
+	else if (connectivity == 8)
+		applyWithMask<8, -1, -1, -1,  0,  0,  1,  1,  1, -1,  0,  1, -1,  1, -1,  0,  1>(
+			env, object, hMin, hMax, size1, size2, verbose,
+			imagePixelsObj, maskPixelsObj, resultPixelsObj, MASK, WSHED, INIT, INQUEUE);
 }
 
